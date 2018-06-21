@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 
 	oidc "github.com/coreos/go-oidc"
@@ -25,9 +26,24 @@ var (
 	clientSecret = flag.String("client-secret", "", "")
 )
 
-const (
-	storageFile = "/home/dirbaio/.config/git-oidc/oidc.json"
-)
+func getStoragePath() string {
+	return filepath.Join(getConfigPath(), "git-oidc")
+}
+
+func getConfigPath() string {
+	if runtime.GOOS == "windows" {
+		return os.Getenv("APPDATA")
+	}
+	if runtime.GOOS == "darwin" {
+		return filepath.Join(os.Getenv("HOME"), "Library/Application Support")
+	}
+
+	if os.Getenv("XDG_CONFIG_HOME") != "" {
+		return os.Getenv("XDG_CONFIG_HOME")
+	} else {
+		return filepath.Join(os.Getenv("HOME"), ".config")
+	}
+}
 
 type State struct {
 	IDToken      string `json:"id_token"`
@@ -38,7 +54,9 @@ type State struct {
 }
 
 func LoadState() (*State, error) {
-	data, err := ioutil.ReadFile(storageFile)
+	path := getStoragePath()
+	path = filepath.Join(path, "oidc.json")
+	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return &State{}, err
 	}
@@ -56,7 +74,10 @@ func SaveState(c *State) {
 		panic(err)
 	}
 
-	err = ioutil.WriteFile(storageFile, data, 0700)
+	path := getStoragePath()
+	os.MkdirAll(path, 0700)
+	path = filepath.Join(path, "oidc.json")
+	err = ioutil.WriteFile(path, data, 0600)
 	if err != nil {
 		panic(err)
 	}
